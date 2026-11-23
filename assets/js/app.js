@@ -96,6 +96,7 @@
     "Code, Kaffee, Linux und ein starkes Passwort gehoeren zusammen."
   ];
   let sampleIndex = 0;
+  let minimalPresetActive = false;
 
   // Deterministic pseudo-random helper based on index & char so live typing doesn't flicker wildly
   function shouldApply(index, intensityPercent) {
@@ -231,11 +232,16 @@
     syncRuleBoxes();
 
     const raw = inputEl.value;
-    const converted = transformText(raw, opts);
+    const converted = minimalPresetActive
+      ? raw.replace(/[eE]/g, "3")
+      : transformText(raw, opts);
     outputEl.value = converted;
 
     updateStats(raw, inputStatsEl);
     updateStats(converted, outputStatsEl);
+    if (minimalPresetActive) {
+      activeRulesSummaryEl.textContent = "Preset: Minimal (nur E → 3)";
+    }
   }
 
   function applyPreset(presetName) {
@@ -247,7 +253,8 @@
     };
 
     if (presetName === "minimal") {
-      // Spezieller Minimal-Modus: nur E -> 3 über Ziffern-Regel mit niedriger Intensität oder direktes E->3
+      // Keep the minimal transformation active as the input changes.
+      minimalPresetActive = true;
       ruleDigitsEl.checked = true;
       ruleSymbolsEl.checked = false;
       ruleUmlautsEl.checked = false;
@@ -256,20 +263,13 @@
       ruleMixedCaseEl.checked = false;
       intensityRangeEl.value = 100;
 
-      // Nur 'e' in Ziffern umwandeln für echten Minimal-Effekt
-      const raw = inputEl.value;
-      const onlyE = raw.replace(/[eE]/g, "3");
-      outputEl.value = onlyE;
-      updateStats(raw, inputStatsEl);
-      updateStats(onlyE, outputStatsEl);
-      intensityValueEl.textContent = "100% (Nur E→3)";
-      syncRuleBoxes();
-      activeRulesSummaryEl.textContent = "Preset: Minimal (nur E → 3)";
+      render();
       return;
     }
 
     const cfg = presets[presetName];
     if (!cfg) return;
+    minimalPresetActive = false;
 
     ruleDigitsEl.checked = cfg.digits;
     ruleSymbolsEl.checked = cfg.symbols;
@@ -284,7 +284,6 @@
 
   // Event Listeners
   [
-    inputEl,
     ruleDigitsEl,
     ruleSymbolsEl,
     ruleUmlautsEl,
@@ -293,15 +292,24 @@
     ruleMixedCaseEl,
     intensityRangeEl
   ].forEach((el) => {
-    el.addEventListener("input", render);
-    el.addEventListener("change", render);
+    const update = () => {
+      minimalPresetActive = false;
+      render();
+    };
+    el.addEventListener("input", update);
+    el.addEventListener("change", update);
   });
+
+  // Typing changes the text, but should not discard the selected Minimal preset.
+  inputEl.addEventListener("input", render);
+  inputEl.addEventListener("change", render);
 
   document.querySelectorAll("[data-preset]").forEach((btn) => {
     btn.addEventListener("click", () => applyPreset(btn.dataset.preset));
   });
 
   resetRulesBtn.addEventListener("click", () => {
+    minimalPresetActive = false;
     ruleDigitsEl.checked = true;
     ruleSymbolsEl.checked = false;
     ruleUmlautsEl.checked = true;
